@@ -10,7 +10,7 @@ typedef struct {
   int left, right, down, up, top;
 } node_t;
 
-unsigned long long count = 0;
+/* unsigned long long count = 0; */
 int n, N, Z, NOPTS, NSOLS;
 const int SETSIZE = 3;
 int *SOLUTION = NULL, **L = NULL;
@@ -179,8 +179,8 @@ void print(void)
 void dfs(int k)
 {
   if ( TABLE[0].right == 0 ) {
-    count++;
-    /* print(); */
+    /* count++; */
+    print();
     return;
   }
 
@@ -282,7 +282,7 @@ int main(int argc, char **argv)
   dfs(0);
   destroy();
 
-  printf("%llu\n", count);
+  /* printf("%llu\n", count); */
 
   exit(0);
 }

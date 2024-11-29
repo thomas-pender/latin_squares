@@ -13,13 +13,16 @@ src_libcliquer_la_CPPFLAGS = -I$(top_srcdir)/cliquer-1.21 -DENABLE_LONG_OPTIONS
 noinst_PROGRAMS = src/transversals src/parallel_transversals src/mates src/moles
 
 src_transversals_SOURCES = $(top_srcdir)/src/transversals.c
+src_transversals_CPPFLAGS = -I$(top_srcdir)/src
+
 src_mates_SOURCES = $(top_srcdir)/src/mates.c
+src_mates_CPPFLAGS = -I$(top_srcdir)/src
 
 src_parallel_transversals_SOURCES = $(top_srcdir)/src/parallel_transversals.c
-src_parallel_transversals_LDADD = 
+src_parallel_transversals_CPPFLAGS = -I$(top_srcdir)/src
 
 src_moles_SOURCES = $(top_srcdir)/src/moles.c
-src_moles_CPPFLAGS = -I$(top_srcdir)/cliquer-1.21
+src_moles_CPPFLAGS = -I$(top_srcdir)/cliquer-1.21 -I$(top_srcdir)/src
 src_moles_LDADD = $(top_builddir)/src/libcliquer.la
 
 EXTRA_DIST = $(top_srcdir)/test

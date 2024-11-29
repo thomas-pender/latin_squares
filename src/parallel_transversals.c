@@ -1,3 +1,5 @@
+# include <config.h>
+
 # include <stdio.h>
 # include <stdlib.h>
 # include <stddef.h>
@@ -7,7 +9,7 @@
 # include <error.h>
 # include <pthread.h>
 
-# define NTHREADS 6
+# define NTHREADS 3
 # define ARR_MAX 100
 
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;

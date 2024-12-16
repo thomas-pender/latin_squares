@@ -9,19 +9,27 @@
 
 # define NTHREADS 3
 
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
 typedef struct {
   int left, right, down, up, top;
 } node_t;
 
-int n, N, Z, NOPTS, NSOLS, SETSIZE;
+typedef struct {
+  node_t *table;
+  int *restrict solution, *restrict*restrict L, *restrict*restrict sym;
+  int first, last;
+} args_t;
+
+int n, N, Z, NOPTS, NSOLS, SETSIZE, FIRST, LAST;
 int **TRANSVERSALS = NULL;
 
 // initialize ------------------------------------------------------------------
 
 void initialize(node_t **table,
                 int *restrict*restrict solution,
-                int *restrict*restrict* L,
-                int *restrict*restrict* sym)
+                int *restrict*restrict*restrict L,
+                int *restrict*restrict*restrict sym)
 {
   int i, j, k, item, p;
 
@@ -48,7 +56,7 @@ void initialize(node_t **table,
     /* length */
     (*table)[i].top = 0;
   }
-  (*t)able[0].left = N;
+  (*table)[0].left = N;
   (*table)[N].right = 0;
 
   /* initialize links in body */
@@ -83,16 +91,17 @@ void initialize(node_t **table,
 }
 
 static inline
-void destroy(node_t **table, int **solution, int ***L, int ***sym)
+void destroy(args_t *args)
 {
-  if ( *table != NULL ) free(*table);
-  if ( *solution != NULL ) free(*solution);
+  if ( args->table != NULL ) free(args->table);
+  if ( args->solution != NULL ) free(args->solution);
 
   for ( int i = 0; i < n; i++ ) {
-    free((*L)[i]);
-    free((*sym)[i]);
+    if ( args->L[i] != NULL ) free(args->L[i]);
+    if ( args->sym[i] != NULL ) free(args->sym[i]);
   }
-  free(*L); free(*sym);
+  if ( args->L != NULL ) free((int**)(args->L));
+  if ( args->sym != NULL ) free((int**)(args->sym));
 }
 
 // covering/uncovering----------------------------------------------------------
@@ -169,84 +178,99 @@ int square_cmp(const void *_a, const void *_b)
   return 0;
 }
 
-void copy_sol(node_t *table, int *restrict solution, int *restrict* sym)
+void copy_sol(args_t *args)
 {
   int i, j, s, k;
   for ( i = 0, k = 0; i < NSOLS; i++, k = 0 ) {
-    s = solution[i];
+    s = args->solution[i];
     j = s;
     do {
-      sym[i][k++] = table[j].top;
-      j = table[j].right;
+      args->sym[i][k++] = args->table[j].top;
+      j = args->table[j].right;
     } while (j != s);
   }
 
   for ( i = 0; i < n; i++ )
-    qsort(sym[i], n, sizeof(sym[i][0]), arr_cmp);
-  qsort(sym, n, sizeof(sym[0]), square_cmp);
+    qsort(args->sym[i], n, sizeof(args->sym[i][0]), arr_cmp);
+  qsort((int**)(args->sym), n, sizeof(args->sym[0]), square_cmp);
 }
 
 static inline
-void make_arr(int *restrict*restrict sym, int *restrict*restrict L)
+void make_arr(args_t *args)
 {
   int i, j, c, r;
   for ( i = 0; i < n; i++ )
     for ( j = 0; j < n; j++ ) {
-      c = (sym[i][j] - 1) % n;
-      r = (sym[i][j] - c - 1) / n;
-      L[r][c] = i + 1;
+      c = (args->sym[i][j] - 1) % n;
+      r = (args->sym[i][j] - c - 1) / n;
+      args->L[r][c] = i + 1;
     }
 }
 
 static inline
-void print_arr(int **L)
+void print_arr(args_t *args)
 {
   int i, j;
   for ( i = 0; i < n; i++ )
     for ( j = 0; j < n ; j++ )
-      printf("%d ", L[i][j]);
+      printf("%d ", args->L[i][j]);
   printf("\n");
 }
 
 static inline
-void print(node_t *table, int *restrict*restrict sym, int *restrict*restrict L)
+void print(args_t *args)
 {
-  copy_sol(table, solution, sym);
-  make_arr(sym, L);
-  print_arr(L);
+  copy_sol(args);
+  make_arr(args);
+
+  pthread_mutex_lock(&mtx);
+  print_arr(args);
   fflush(stdout);
+  pthread_mutex_unlock(&mtx);
 }
 
 // algorithm X -----------------------------------------------------------------
 
-void dfs(node_t *table,
-         int *restrict solution,
-         int *restrict*restrict sym,
-         int *restrict*restrict L,
-         unsigned k)
+void dfs(args_t *args, int k)
 {
-  if ( table[0].right == 0 ) {
-    print();
+  if ( args->table[0].right == 0 ) {
+    print(args);
     return;
   }
 
   int j, c, r, l, d, u;
 
-  c = min();
-  cover(c);
+  c = min(args->table);
+  cover(args->table, c);
 
-  for ( r = table[c].down; r != c; r = table[r].down ) {
-    solution[k] = r;
-    for ( j = table[r].right; j != r; j = table[j].right )
-      cover(table[j].top);
-    dfs(table, solution, sym, L, k + 1);
-    r = solution[k];
-    c = table[r].top;
-    for ( j = table[r].left; j != r; j = table[j].left )
-      uncover(table[j].top);
+  if ( k == 0 ) {
+    int p;
+    for ( p = 0, r = args->table[c].down; p < r != c && p < args->first; r = args->table[r].down, p++ );
+    for ( ; r != c && p < args->last; r = args->table[r].down, p++ ) {
+      args->solution[k] = r;
+      for ( j = args->table[r].right; j != r; j = args->table[j].right )
+        cover(args->table, args->table[j].top);
+      dfs(args, k + 1);
+      r = args->solution[k];
+      c = args->table[r].top;
+      for ( j = args->table[r].left; j != r; j = args->table[j].left )
+        uncover(args->table, args->table[j].top);
+    }
+  }
+  else {
+    for ( r = args->table[c].down; r != c; r = args->table[r].down ) {
+      args->solution[k] = r;
+      for ( j = args->table[r].right; j != r; j = args->table[j].right )
+        cover(args->table, args->table[j].top);
+      dfs(args, k + 1);
+      r = args->solution[k];
+      c = args->table[r].top;
+      for ( j = args->table[r].left; j != r; j = args->table[j].left )
+        uncover(args->table, args->table[j].top);
+    }
   }
 
-  uncover(c);
+  uncover(args->table, c);
 }
 
 // transversals ----------------------------------------------------------------
@@ -283,28 +307,75 @@ void free_transversals(void)
   }
 }
 
+// find parameters -------------------------------------------------------------
+
+static inline
+int min_nopts(node_t *table)
+{
+  return table[min(table)].top;
+}
+
+// thread func -----------------------------------------------------------------
+
+void *thread_func(void *_args)
+{
+  args_t *args = (args_t*)_args;
+  dfs(args, 0);
+  return NULL;
+}
+
 // driver ----------------------------------------------------------------------
 
 int main(int argc, char **argv)
 {
-  if ( argc < 3 )
-    error(1, errno, "USAGE: ./mates <side> <ntransversals> < <ifile>");
+  if ( argc < 5 )
+    error(1, errno, "USAGE: ./mates <side> <ntransversals> <first> <last> < <ifile>");
 
   if ( sscanf(argv[1], "%d", &n) == EOF )
     error(1, errno, "ERROR: could not read <side>");
   if ( sscanf(argv[2], "%d", &NOPTS) == EOF )
     error(1, errno, "ERROR: could not read <ntransversals>");
+  if ( sscanf(argv[3], "%d", &FIRST) == EOF )
+    error(1, errno, "ERROR: could not read <first>");
+  if ( sscanf(argv[4], "%d", &LAST) == EOF )
+    error(1, errno, "ERROR: could not read <last>");
 
   N = n * n;
   SETSIZE = n;
   Z = N + (NOPTS * SETSIZE);
   NSOLS = n;
 
+  unsigned i;
+  args_t args[NTHREADS];
+  pthread_t threads[NTHREADS];
+
   read_transversals();
-  initialize();
+  for ( i = 0; i < NTHREADS; i++ )
+    initialize(&(args[i].table), &(args[i].solution),
+               &(args[i].L), &(args[i].sym));
   free_transversals();
-  dfs(0);
-  destroy();
+
+  int nopts = LAST - FIRST;
+  int block_len = nopts / NTHREADS;
+
+  args[0].first = FIRST;
+  args[0].last = FIRST + block_len;
+  for ( i = 1; i < NTHREADS - 1; i++ ) {
+    args[i].first = args[i - 1].last;
+    args[i].last = args[i - 1].last + block_len;
+  }
+  args[NTHREADS - 1].first = args[NTHREADS - 2].last;
+  args[NTHREADS - 1].last = LAST;
+
+  int throw;
+  for ( i = 0; i < NTHREADS; i++ )
+    if ( (throw = pthread_create(&threads[i], NULL, thread_func, &args[i])) != 0 )
+      error(1, throw, "ERROR: pthread_create failed:%d", i);
+  for ( i = 0; i < NTHREADS; i++ )
+    if ( (throw = pthread_join(threads[i], NULL)) != 0 )
+      error(1, throw, "ERROR: pthread_join failed:%d", i);
+
+  for ( i = 0; i < NTHREADS; i++ ) destroy(&args[i]);
 
   exit(0);
 }

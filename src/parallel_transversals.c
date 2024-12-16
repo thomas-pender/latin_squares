@@ -356,10 +356,13 @@ int main(int argc, char **argv)
   args[NTHREADS - 1].first = args[NTHREADS - 2].last + 1;
   args[NTHREADS - 1].last = last;
 
+  int throw;
   for ( i = 0; i < NTHREADS; i++ )
-    pthread_create(&threads[i], NULL, thread_func, &args[i]);
+    if ( (throw = pthread_create(&threads[i], NULL, thread_func, &args[i])) != 0 )
+      error(1, throw, "ERROR: pthread_create failed:%d", i);
   for ( i = 0; i < NTHREADS; i++ )
-    pthread_join(threads[i], NULL);
+    if ( (throw = pthread_join(threads[i], NULL)) != 0 )
+      error(1, throw, "ERROR: pthread_join failed:%d", i);
 
   destroy_square();
 

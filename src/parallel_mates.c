@@ -245,7 +245,7 @@ void dfs(args_t *args, int k)
 
   if ( k == 0 ) {
     int p;
-    for ( p = 0, r = args->table[c].down; p < r != c && p < args->first; r = args->table[r].down, p++ );
+    for ( p = 0, r = args->table[c].down; r != c && p < args->first; r = args->table[r].down, p++ );
     for ( ; r != c && p < args->last; r = args->table[r].down, p++ ) {
       args->solution[k] = r;
       for ( j = args->table[r].right; j != r; j = args->table[j].right )
